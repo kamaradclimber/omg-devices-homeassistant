@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.config_entry_flow import DiscoveryFlowHandler
 from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
+from homeassistant.components import mqtt
 
 from .const import DOMAIN
 
@@ -39,6 +40,10 @@ class HeishaMonFlowHandler(DiscoveryFlowHandler[Awaitable[bool]], domain=DOMAIN)
         )
         try:
             message = json.loads(discovery_info.payload)
+            if "mac" in message:
+                self._via_device_id = message["mac"].replace(":", "")
+            else:
+                self._via_device_id = "unknown"
         except json.decoder.JSONDecodeError:
             # not a OMG message, let's ignore it for now
             return self.async_abort(reason="invalid_discovery_info")
@@ -64,7 +69,7 @@ class HeishaMonFlowHandler(DiscoveryFlowHandler[Awaitable[bool]], domain=DOMAIN)
         if not self._prefix:
             return self.async_abort(reason="unsupported_manual_setup")
 
-        data = {"discovery_prefix": self._prefix}
+        data = {"discovery_prefix": self._prefix, "via_device": (mqtt.const.DOMAIN, self._via_device_id)}
 
         if user_input is None:
             return self.async_show_form(

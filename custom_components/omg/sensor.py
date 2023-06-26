@@ -288,6 +288,7 @@ class OMGDeviceSensor(SensorEntity):
         self.entity_description = description
         self._device = description.device
         self.entity_id = f"sensor.{slugify(description.key.replace('/', '_'))}_{slugify(self._device.id)}"
+        self.config_entry = config_entry
         self._attr_unique_id = (
                 f"{config_entry.entry_id}-{self._device.id}-{description.key}"
                 )
@@ -297,6 +298,6 @@ class OMGDeviceSensor(SensorEntity):
         return {
                 "identifiers": {(DOMAIN, self._device.id)},
                 "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
-                "manufacturer": "MakeFabs",
-                "via_device": ("unknown")
+                "manufacturer": "MakerFabs",
+                "via_device": self.config_entry.data["via_device"]
                 }
