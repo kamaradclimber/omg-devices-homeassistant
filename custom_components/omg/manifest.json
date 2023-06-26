@@ -1,0 +1,13 @@
+{
+  "domain": "omg",
+  "name": "OMG devices",
+  "codeowners": ["@kamaradclimber"],
+  "config_flow": true,
+  "dependencies": ["mqtt", "template"],
+  "documentation": "https://github.com/kamaradclimber/omg-devices-homeassistant",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/kamaradclimber/omg-devices-homeassistant/issues",
+  "mqtt": ["+/+/SYStoMQTT"],
+  "version": "0.0.1"
+}
