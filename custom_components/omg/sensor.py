@@ -185,7 +185,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         if self.moisture_sensor is None:
             desc = OMGDeviceSensorDescription(
                     key="moisture",
-                    name="moisture",
+                    name="Moisture",
                     device=self,
                     native_unit_of_measurement="%",
                     suggested_display_precision=0,
