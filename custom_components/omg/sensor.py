@@ -2,22 +2,22 @@
 from __future__ import annotations
 from string import Template
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from collections.abc import Callable
 from typing import Any, Optional
+from typing_extensions import Self
 import re
 import json
 
 from homeassistant.components import mqtt
 from homeassistant.components.sensor import (
     SensorEntity,
-    SensorStateClass,
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntityDescription,
+    SensorExtraStoredData,
 )
-from homeassistant.components.template.sensor import SensorTemplate
 from homeassistant.helpers.entity import EntityCategory
-from homeassistant.helpers import template as template_helper
 from homeassistant.const import (
     CONF_NAME,
     CONF_STATE,
@@ -25,16 +25,10 @@ from homeassistant.const import (
     CONF_UNIT_OF_MEASUREMENT,
 )
 from .const import DOMAIN
-from homeassistant.helpers.template_entity import CONF_AVAILABILITY
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
-from homeassistant.components.sensor import (
-        SensorEntity,
-        SensorDeviceClass,
-        SensorEntityDescription,
-        )
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,7 +44,7 @@ async def async_setup_entry(
     """Set up sensors from config entry."""
     discovery_prefix = config_entry.data[
         "discovery_prefix"
-    ]  # TODO: handle migration of entities
+    ]
     _LOGGER.debug(f"Starting bootstrap of sensors with prefix '{discovery_prefix}'")
     router_sensor = OMGRouterSensor(hass, discovery_prefix, config_entry, async_add_entities)
     async_add_entities([router_sensor])
@@ -60,7 +54,7 @@ class LoRaDevice:
     def match(message: str) -> Optional[str]:
         return None
 
-    def receive(self, message, async_add_entities: Callable) -> None:
+    def receive(self, message, restore_only) -> None:
         pass
 
     def __init__(self, message: str):
@@ -70,6 +64,10 @@ class LoRaDevice:
     @property
     def id(self) -> str:
         return self._id
+
+    @property
+    def full_id(self) -> str:
+        return type(self).__name__ + "_" + self.id
 
 class MakerFabsSoilSensorV3JSON(LoRaDevice):
     @staticmethod
@@ -99,7 +97,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
         self.battery_sensor = None
         self.moisture_sensor = None
 
-    def receive(self, message):
+    def receive(self, message, restore_only):
         # here we assume message is perfectly valid
         j = json.loads(message)
         j = json.loads(j['message'])
@@ -161,10 +159,11 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
             self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.moisture_sensor])
 
-        self.humidity_sensor.entity_description.on_receive(self.humidity_sensor, j, 'hum')
-        self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, j, 'temp')
-        self.battery_sensor.entity_description.on_receive(self.battery_sensor, j, 'bat')
-        self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, j, 'adc')
+        if not restore_only:
+            self.humidity_sensor.entity_description.on_receive(self.humidity_sensor, j, 'hum')
+            self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, j, 'temp')
+            self.battery_sensor.entity_description.on_receive(self.battery_sensor, j, 'bat')
+            self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, j, 'adc')
 
 
 
@@ -199,7 +198,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         self.battery_sensor = None
         self.moisture_sensor = None
 
-    def receive(self, message):
+    def receive(self, message, restore_only):
         # here we assume message is perfectly valid
         j = json.loads(message)
         m = MakerFabsSoilSensorV3.MATCHER.match(j['message'])
@@ -221,7 +220,9 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                 )
             self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.humidity_sensor])
-        self.humidity_sensor.entity_description.on_receive(self.humidity_sensor, m, 3)
+
+        if not restore_only:
+            self.humidity_sensor.entity_description.on_receive(self.humidity_sensor, m, 3)
 
         if self.temperature_sensor is None:
             desc = OMGDeviceSensorDescription(
@@ -234,7 +235,8 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                 )
             self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.temperature_sensor])
-        self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, m, 4)
+        if not restore_only:
+            self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, m, 4)
 
         if self.adc_sensor is None:
             desc = OMGDeviceSensorDescription(
@@ -246,7 +248,8 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                 )
             self.adc_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.adc_sensor])
-        self.adc_sensor.entity_description.on_receive(self.adc_sensor, m, 5)
+        if not restore_only:
+            self.adc_sensor.entity_description.on_receive(self.adc_sensor, m, 5)
 
         def parse_as_battery(sensor: SensorEntity, match: re.Match, group_index: int):
             battery_level = float(match.group(6)) * 3.3 / 1024
@@ -266,7 +269,8 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                 )
             self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.battery_sensor])
-        self.battery_sensor.entity_description.on_receive(self.battery_sensor, m, 4)
+        if not restore_only:
+            self.battery_sensor.entity_description.on_receive(self.battery_sensor, m, 4)
 
         def parse_moisture(sensor: SensorEntity, match: re.Match, group_index: int):
             battery_level = float(match.group(6)) * 3.3 / 1024
@@ -287,12 +291,35 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                 )
             self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
             self.async_add_entities([self.moisture_sensor])
-        self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, m, 5)
+        if not restore_only:
+            self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, m, 5)
 
 
+@dataclass
+class OMGRouterExtraStoredData(SensorExtraStoredData):
+    # This class will allow to memory devices that sent a message "recently"
+    # and restore them at startup of HA
+    recent_messages: dict[str, str]
 
+    def as_dict(self) -> dict[str, Any]:
+        data = super().as_dict()
+        data["recent_messages"] = self.recent_messages
+        return data
 
-class OMGRouterSensor(SensorEntity):
+    @classmethod
+    def from_dict(cls, restored: dict[str, Any]) -> Self | None:
+        extra  = SensorExtraStoredData.from_dict(restored)
+        if extra is None:
+            return None
+        if "recent_messages" not in restored:
+            return None
+        return cls(
+                extra.native_value,
+                extra.native_unit_of_measurement,
+                restored['recent_messages']
+                )
+
+class OMGRouterSensor(RestoreSensor):
     """A sensor which will parse incoming message and define new sensor accordingly"""
 
     def __init__(
@@ -320,47 +347,67 @@ class OMGRouterSensor(SensorEntity):
         self.known_devices = []
         self.all_devices_classes = [MakerFabsSoilSensorV3]
         self._async_add_entities = async_add_entities
+        self.recent_messages = dict()
+
+    def route_message(self, message_payload, restore_only=False):
+        matching_device = None
+        for device in self.known_devices:
+            m = type(device).match(message_payload)
+            if m is not None and m == device.id:
+                matching_device = device
+                _LOGGER.debug("We recognized %s-%s", type(matching_device).__name__, matching_device.id)
+                break
+        if matching_device is None:
+            for klass in self.all_devices_classes:
+                m = klass.match(message_payload)
+                if m is not None:
+                    matching_device = klass(message_payload, self.hass, self.config_entry, self._async_add_entities)
+                    self.known_devices.append(matching_device)
+                    _LOGGER.info("We discovered %s-%s", type(matching_device).__name__, matching_device.id)
+                    break
+        if matching_device is None:
+            _LOGGER.info("Unable to deal with this message for now, submit a PR to support it!")
+            return
+
+        self.recent_messages[matching_device.full_id] = message_payload
+        matching_device.receive(message_payload, restore_only)
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to MQTT events"""
         await super().async_added_to_hass()
+        if restored_data := await self.async_get_last_sensor_data():
+            self._attr_native_value = restored_data.native_value
+            self.recent_messages = restored_data.recent_messages
+            for device_full_id in self.recent_messages:
+                _LOGGER.info(f"Restoring device '{device_full_id}'")
+                self.route_message(self.recent_messages[device_full_id], restore_only=True)
+
 
         @callback
         def message_received(message):
             """Handle new MQTT messages."""
-            _LOGGER.warn("Received a new mqtt message")
-            _LOGGER.warn(message.payload)
             self._attr_native_value = message.payload
-
             self.async_write_ha_state()
 
-
-            matching_device = None
-            for device in self.known_devices:
-                m = type(device).match(message.payload)
-                if m is not None and m == device.id:
-                    matching_device = device
-                    _LOGGER.debug("We recognized %s-%s", type(matching_device).__name__, matching_device.id)
-                    break
-            if matching_device is None:
-                for klass in self.all_devices_classes:
-                    m = klass.match(message.payload)
-                    if m is not None:
-                        matching_device = klass(message.payload, self.hass, self.config_entry, self._async_add_entities)
-                        self.known_devices.append(matching_device)
-                        _LOGGER.info("We discovered %s-%s", type(matching_device).__name__, matching_device.id)
-                        break
-            if matching_device is None:
-                _LOGGER.info("Unable to deal with this message for now, submit a PR to support it!")
-                return
-
-            matching_device.receive(message.payload)
-
+            self.route_message(message.payload)
 
 
         await mqtt.async_subscribe(
             self.hass, self.mqtt_topic, message_received, 1
         )
+
+    @property
+    def extra_restore_state_data(self) -> OMGRouterExtraStoredData:
+        return OMGRouterExtraStoredData(
+                self.native_value,
+                self.native_unit_of_measurement,
+                self.recent_messages
+        )
+
+    async def async_get_last_sensor_data(self) -> OMGRouterExtraStoredData | None:
+        if (restored_last_extra_data := await self.async_get_last_extra_data()) is None:
+            return None
+        return OMGRouterExtraStoredData.from_dict(restored_last_extra_data.as_dict())
 
 @dataclass
 class BaseOMGDeviceDescription:
@@ -371,7 +418,7 @@ class BaseOMGDeviceDescription:
 class OMGDeviceSensorDescription(SensorEntityDescription, BaseOMGDeviceDescription):
     pass
 
-class OMGDeviceSensor(SensorEntity):
+class OMGDeviceSensor(RestoreSensor):
     def __init__(self,
                  hass: HomeAssistant,
                  description: OMGDeviceSensorDescription,
@@ -385,6 +432,12 @@ class OMGDeviceSensor(SensorEntity):
         self._attr_unique_id = (
                 f"{config_entry.entry_id}-{self._device.id}-{description.key}"
                 )
+
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if restored_data := await self.async_get_last_sensor_data():
+            self._attr_native_value = restored_data.native_value
 
     @property
     def device_info(self):

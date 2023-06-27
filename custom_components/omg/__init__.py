@@ -14,7 +14,6 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration."""
-    _LOGGER.warn("Starting!")
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
