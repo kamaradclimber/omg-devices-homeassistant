@@ -93,7 +93,6 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
         self.config_entry = config_entry
         self.humidity_sensor = None
         self.temperature_sensor = None
-        self.adc_sensor = None
         self.battery_sensor = None
         self.moisture_sensor = None
 
@@ -104,9 +103,6 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
 
         def parse_as_float(sensor: SensorEntity, json: dict, key: str):
             sensor._attr_native_value = float(json[key])
-
-        def parse_as_int(sensor: SensorEntity, json: dict, key: str):
-            sensor._attr_native_value = int(json[key])
 
         device_info = {
                 "identifiers": {(DOMAIN, self.id)},
@@ -215,9 +211,6 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         def parse_as_float(sensor: SensorEntity, match: re.Match, group_index: int):
             sensor._attr_native_value = float(match.group(group_index))
 
-        def parse_as_int(sensor: SensorEntity, match: re.Match, group_index: int):
-            sensor._attr_native_value = int(match.group(group_index))
-
         device_info = {
                 "identifiers": {(DOMAIN, self.id)},
                 "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
@@ -262,7 +255,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     name="ADC",
                     device=self,
                     entity_category=EntityCategory.DIAGNOSTIC,
-                    on_receive=parse_as_int
+                    on_receive=parse_as_float
                 )
             self.adc_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.adc_sensor])
