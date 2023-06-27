@@ -108,6 +108,15 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
         def parse_as_int(sensor: SensorEntity, json: dict, key: str):
             sensor._attr_native_value = int(json[key])
 
+        device_info = {
+                "identifiers": {(DOMAIN, self.id)},
+                "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
+                "manufacturer": "MakerFabs",
+                "hw_version": "V3",
+                "suggested_area": "garden",
+                "via_device": tuple(self.config_entry.data["via_device"])
+                }
+
         if self.humidity_sensor is None:
             desc = OMGDeviceSensorDescription(
                     key="humidity",
@@ -117,7 +126,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
                     device_class=SensorDeviceClass.HUMIDITY,
                     on_receive=parse_as_float
                 )
-            self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.humidity_sensor])
 
         if self.temperature_sensor is None:
@@ -129,7 +138,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
                     device_class=SensorDeviceClass.TEMPERATURE,
                     on_receive=parse_as_float
                 )
-            self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.temperature_sensor])
 
         if self.battery_sensor is None:
@@ -143,7 +152,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
                     device_class=SensorDeviceClass.VOLTAGE,
                     on_receive=parse_as_float
                 )
-            self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.battery_sensor])
 
         if self.moisture_sensor is None:
@@ -156,7 +165,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
                     device_class=SensorDeviceClass.MOISTURE,
                     on_receive=parse_as_float
                 )
-            self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.moisture_sensor])
 
         if not restore_only:
@@ -209,6 +218,15 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         def parse_as_int(sensor: SensorEntity, match: re.Match, group_index: int):
             sensor._attr_native_value = int(match.group(group_index))
 
+        device_info = {
+                "identifiers": {(DOMAIN, self.id)},
+                "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
+                "manufacturer": "MakerFabs",
+                "hw_version": "V3",
+                "suggested_area": "garden",
+                "via_device": tuple(self.config_entry.data["via_device"])
+                }
+
         if self.humidity_sensor is None:
             desc = OMGDeviceSensorDescription(
                     key="humidity",
@@ -218,7 +236,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     device_class=SensorDeviceClass.HUMIDITY,
                     on_receive=parse_as_float
                 )
-            self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.humidity_sensor])
 
         if not restore_only:
@@ -233,7 +251,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     device_class=SensorDeviceClass.TEMPERATURE,
                     on_receive=parse_as_float
                 )
-            self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.temperature_sensor])
         if not restore_only:
             self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, m, 4)
@@ -246,7 +264,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     entity_category=EntityCategory.DIAGNOSTIC,
                     on_receive=parse_as_int
                 )
-            self.adc_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.adc_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.adc_sensor])
         if not restore_only:
             self.adc_sensor.entity_description.on_receive(self.adc_sensor, m, 5)
@@ -267,7 +285,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     device_class=SensorDeviceClass.VOLTAGE,
                     on_receive=parse_as_battery
                 )
-            self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.battery_sensor])
         if not restore_only:
             self.battery_sensor.entity_description.on_receive(self.battery_sensor, m, 4)
@@ -289,7 +307,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
                     device_class=SensorDeviceClass.MOISTURE,
                     on_receive=parse_moisture
                 )
-            self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry, device_info)
             self.async_add_entities([self.moisture_sensor])
         if not restore_only:
             self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, m, 5)
@@ -422,13 +440,15 @@ class OMGDeviceSensor(RestoreSensor):
     def __init__(self,
                  hass: HomeAssistant,
                  description: OMGDeviceSensorDescription,
-                 config_entry: ConfigEntry
+                 config_entry: ConfigEntry,
+                 device_info: dict,
                  ) -> None:
         self.hass = hass
         self.entity_description = description
         self._device = description.device
         self.entity_id = f"sensor.{slugify(description.key.replace('/', '_'))}_{slugify(self._device.id)}"
         self.config_entry = config_entry
+        self._device_info = device_info
         self._attr_unique_id = (
                 f"{config_entry.entry_id}-{self._device.id}-{description.key}"
                 )
@@ -441,9 +461,4 @@ class OMGDeviceSensor(RestoreSensor):
 
     @property
     def device_info(self):
-        return {
-                "identifiers": {(DOMAIN, self._device.id)},
-                "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
-                "manufacturer": "MakerFabs",
-                "via_device": tuple(self.config_entry.data["via_device"])
-                }
+        return self._device_info
