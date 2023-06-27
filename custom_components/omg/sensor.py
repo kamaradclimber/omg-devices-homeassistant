@@ -392,5 +392,5 @@ class OMGDeviceSensor(SensorEntity):
                 "identifiers": {(DOMAIN, self._device.id)},
                 "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
                 "manufacturer": "MakerFabs",
-                "via_device": self.config_entry.data["via_device"]
+                "via_device": tuple(self.config_entry.data["via_device"])
                 }
