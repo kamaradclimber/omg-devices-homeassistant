@@ -71,6 +71,102 @@ class LoRaDevice:
     def id(self) -> str:
         return self._id
 
+class MakerFabsSoilSensorV3JSON(LoRaDevice):
+    @staticmethod
+    def match(message: str) -> Optional[str]:
+        try:
+            j = json.loads(message)
+            if 'message' not in j:
+                return None
+            j = json.loads(j['message'])
+            if 'node_id' not in j:
+                return None
+            return j['node_id']
+        except json.decoder.JSONDecodeError:
+            return None
+
+    def __init__(self, message: str, hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: Callable):
+        m = MakerFabsSoilSensorV3JSON.match(message)
+        if m is None:
+            assert False, "Constructor should not be called if we don't match"
+        self._id = m
+        self.hass = hass
+        self.async_add_entities = async_add_entities
+        self.config_entry = config_entry
+        self.humidity_sensor = None
+        self.temperature_sensor = None
+        self.adc_sensor = None
+        self.battery_sensor = None
+        self.moisture_sensor = None
+
+    def receive(self, message):
+        # here we assume message is perfectly valid
+        j = json.loads(message)
+        j = json.loads(j['message'])
+
+        def parse_as_float(sensor: SensorEntity, json: dict, key: str):
+            sensor._attr_native_value = float(json[key])
+
+        def parse_as_int(sensor: SensorEntity, json: dict, key: str):
+            sensor._attr_native_value = int(json[key])
+
+        if self.humidity_sensor is None:
+            desc = OMGDeviceSensorDescription(
+                    key="humidity",
+                    name="Humidity",
+                    device=self,
+                    native_unit_of_measurement="%",
+                    device_class=SensorDeviceClass.HUMIDITY,
+                    on_receive=parse_as_float
+                )
+            self.humidity_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.async_add_entities([self.humidity_sensor])
+
+        if self.temperature_sensor is None:
+            desc = OMGDeviceSensorDescription(
+                    key="temperature",
+                    name="Temperature",
+                    device=self,
+                    native_unit_of_measurement="°C",
+                    device_class=SensorDeviceClass.TEMPERATURE,
+                    on_receive=parse_as_float
+                )
+            self.temperature_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.async_add_entities([self.temperature_sensor])
+
+        if self.battery_sensor is None:
+            desc = OMGDeviceSensorDescription(
+                    key="battery",
+                    name="Battery Level",
+                    entity_category=EntityCategory.DIAGNOSTIC,
+                    suggested_display_precision=2,
+                    device=self,
+                    native_unit_of_measurement="V",
+                    device_class=SensorDeviceClass.VOLTAGE,
+                    on_receive=parse_as_float
+                )
+            self.battery_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.async_add_entities([self.battery_sensor])
+
+        if self.moisture_sensor is None:
+            desc = OMGDeviceSensorDescription(
+                    key="moisture",
+                    name="Moisture",
+                    device=self,
+                    native_unit_of_measurement="%",
+                    suggested_display_precision=0,
+                    device_class=SensorDeviceClass.MOISTURE,
+                    on_receive=parse_as_float
+                )
+            self.moisture_sensor = OMGDeviceSensor(self.hass, desc, self.config_entry)
+            self.async_add_entities([self.moisture_sensor])
+
+        self.humidity_sensor.entity_description.on_receive(self.humidity_sensor, j, 'hum')
+        self.temperature_sensor.entity_description.on_receive(self.temperature_sensor, j, 'temp')
+        self.battery_sensor.entity_description.on_receive(self.battery_sensor, j, 'bat')
+        self.moisture_sensor.entity_description.on_receive(self.moisture_sensor, j, 'adc')
+
+
 
 class MakerFabsSoilSensorV3(LoRaDevice):
     MATCHER = re.compile('ID(\d+) REPLY : SOIL INEDX:(\d+) H:(.+) T:(.+) ADC:(\d+) BAT:(\d+)')
@@ -88,9 +184,6 @@ class MakerFabsSoilSensorV3(LoRaDevice):
             return None
         except json.decoder.JSONDecodeError:
             return None
-
-    def parse(self, message) -> None:
-        pass
 
     def __init__(self, message: str, hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: Callable):
         m = MakerFabsSoilSensorV3.match(message)
