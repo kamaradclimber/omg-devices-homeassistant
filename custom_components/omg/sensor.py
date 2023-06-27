@@ -286,7 +286,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         def parse_moisture(sensor: SensorEntity, match: re.Match, group_index: int):
             battery_level = float(match.group(6)) * 3.3 / 1024
             battery_adjustment_factor = 45
-            sensor_value = int(match.group(5)) - battery_adjustment_factor * 2.0 * battery_level
+            sensor_value = float(match.group(5)) - (battery_adjustment_factor - 2.0) * battery_level
             sensor_value = max(sensor_value, 500)
             sensor._attr_native_value = 100 - (( sensor_value - 500)/5)
 
