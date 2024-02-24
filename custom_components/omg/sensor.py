@@ -397,7 +397,10 @@ class OMGRouterSensor(RestoreSensor):
         @callback
         def message_received(message):
             """Handle new MQTT messages."""
-            self._attr_native_value = message.payload
+            native_value = message.payload
+            if len(native_value) > 255:
+                native_value = native_value[0:255]
+            self._attr_native_value = native_value
             self.async_write_ha_state()
 
             self.route_message(message.payload)
