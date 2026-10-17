@@ -18,6 +18,8 @@ from homeassistant.components.sensor import (
     SensorExtraStoredData,
 )
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.const import (
     CONF_NAME,
     CONF_STATE,
@@ -48,6 +50,26 @@ async def async_setup_entry(
     _LOGGER.debug(f"Starting bootstrap of sensors with prefix '{discovery_prefix}'")
     router_sensor = OMGRouterSensor(hass, discovery_prefix, config_entry, async_add_entities)
     async_add_entities([router_sensor])
+
+
+def build_device_info(
+    hass: HomeAssistant, device_id: str, config_entry: ConfigEntry
+) -> DeviceInfo:
+    """Build the device info for a LoRa sensor."""
+    device_info_fields: dict[str, Any] = {
+        "identifiers": {(DOMAIN, device_id)},
+        "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
+        "manufacturer": "MakerFabs",
+        "hw_version": "V3",
+        "suggested_area": "garden",
+    }
+    parent = dr.async_get(hass).async_get_device(
+        identifiers={tuple(config_entry.data["via_device"])}
+    )
+    if parent is not None:
+        device_info_fields["via_device_id"] = parent.id
+    return DeviceInfo(**device_info_fields)
+
 
 class LoRaDevice:
     @staticmethod
@@ -104,14 +126,7 @@ class MakerFabsSoilSensorV3JSON(LoRaDevice):
         def parse_as_float(sensor: SensorEntity, json: dict, key: str):
             sensor._attr_native_value = float(json[key])
 
-        device_info = {
-                "identifiers": {(DOMAIN, self.id)},
-                "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
-                "manufacturer": "MakerFabs",
-                "hw_version": "V3",
-                "suggested_area": "garden",
-                "via_device": tuple(self.config_entry.data["via_device"])
-                }
+        device_info = build_device_info(self.hass, self.id, self.config_entry)
 
         if self.humidity_sensor is None:
             desc = OMGDeviceSensorDescription(
@@ -211,14 +226,7 @@ class MakerFabsSoilSensorV3(LoRaDevice):
         def parse_as_float(sensor: SensorEntity, match: re.Match, group_index: int):
             sensor._attr_native_value = float(match.group(group_index))
 
-        device_info = {
-                "identifiers": {(DOMAIN, self.id)},
-                "name": "Lora Temperature/ Humidity/ Soil Moisture Sensor V3",
-                "manufacturer": "MakerFabs",
-                "hw_version": "V3",
-                "suggested_area": "garden",
-                "via_device": tuple(self.config_entry.data["via_device"])
-                }
+        device_info = build_device_info(self.hass, self.id, self.config_entry)
 
         if self.humidity_sensor is None:
             desc = OMGDeviceSensorDescription(
@@ -437,7 +445,7 @@ class OMGDeviceSensor(RestoreSensor):
                  hass: HomeAssistant,
                  description: OMGDeviceSensorDescription,
                  config_entry: ConfigEntry,
-                 device_info: dict,
+                 device_info: DeviceInfo,
                  ) -> None:
         self.hass = hass
         self.entity_description = description
@@ -456,5 +464,5 @@ class OMGDeviceSensor(RestoreSensor):
             self._attr_native_value = restored_data.native_value
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         return self._device_info
